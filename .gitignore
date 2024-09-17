@@ -1,0 +1,4 @@
+*.out
+buildDir
+build
+.idea

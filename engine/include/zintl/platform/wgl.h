@@ -9,7 +9,6 @@
 
 #include <tuple>
 
-#include <gl/GL.h>
 #include <gl/wglext.h>
 
 namespace zintl::platform {
