@@ -1,6 +1,12 @@
-#include <stdexcept>
+#include <iostream>
 #include <zintl/platform/wgl.h>
+#include <stdexcept>
+#include <gl/GL.h>
+#include <glad/gl.h>
+#include <gl/wglext.h>
 #include <Windows.h>
+
+HMODULE library;
 
 namespace zintl::platform {
     WGLContext::WGLContext() {
@@ -39,16 +45,21 @@ namespace zintl::platform {
             nullptr, nullptr, hInstance, nullptr);
 
         const auto dummyDC = GetDC(dummyHwnd);
+        const auto dummyPixelFormat = GetPixelFormat(dummyDC);
 
         PIXELFORMATDESCRIPTOR dummyPFD;
         ZeroMemory(&dummyPFD, sizeof(dummyPFD));
-        dummyPFD.nSize = sizeof(dummyPFD);
+        /*dummyPFD.nSize = sizeof(dummyPFD);
         dummyPFD.nVersion = 1;
         dummyPFD.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
         dummyPFD.iPixelType = PFD_TYPE_RGBA;
         dummyPFD.cColorBits = 32;
         dummyPFD.cAlphaBits = 8;
+        dummyPFD.iLayerType = PFD_MAIN_PLANE;
         dummyPFD.cDepthBits = 24;
+        dummyPFD.cStencilBits = 8;*/
+
+        DescribePixelFormat(dummyDC, dummyPixelFormat, sizeof(dummyPFD), &dummyPFD);
 
         const auto pixelFormat = ChoosePixelFormat(dummyDC, &dummyPFD);
         if (!pixelFormat) throw std::runtime_error("ChoosePixelFormat failed");
@@ -76,8 +87,14 @@ namespace zintl::platform {
         return {wglChoosePixelFormatARB, wglCreateContextAttribsARB};
     }
 
+    PRCAPIProc loaderWGLGetProcAddress(const char *procName) {
+        return reinterpret_cast<PRCAPIProc>(GetProcAddress(library, procName));
+    }
 
     void WGLContext::init(PlatformWindow &window) {
+        if (!library) library = LoadLibraryW(L"opengl32.dll");
+        if (!library) throw std::runtime_error("Failed to load opengl32.dll");
+
         std::tuple<PFNWGLCHOOSEPIXELFORMATARBPROC, PFNWGLCREATECONTEXTATTRIBSARBPROC> extensions = getWGLExtensions();
         const auto wglChoosePixelFormatARB = std::get<0>(extensions);
         const auto wglCreateContextAttribsARB = std::get<1>(extensions);
@@ -121,6 +138,22 @@ namespace zintl::platform {
 
         this->rc = wglCreateContextAttribsARB(this->dc, nullptr, contextAttribs);
         if (!this->rc) throw std::runtime_error("wglCreateContextAttribsARB failed");
+    }
+
+    PRCAPIProc loaderGLGetProcAddress(const char *procName) {
+        const auto proc = wglGetProcAddress(procName);
+        if (!proc) {
+            std::cout << "opengl: " << procName << std::endl;
+            return reinterpret_cast<PRCAPIProc>(GetProcAddress(library, procName));
+        }
+
+        std::cout << "wgl: " << procName << std::endl;
+        return reinterpret_cast<PRCAPIProc>(proc);
+    }
+
+    // Virtual function cannot be function pointer.
+    ProcLoader WGLContext::getProcLoader() {
+        return static_cast<ProcLoader>(loaderGLGetProcAddress);
     }
 
     void WGLContext::makeCurrent() {

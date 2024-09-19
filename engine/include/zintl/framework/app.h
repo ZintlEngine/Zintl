@@ -5,10 +5,8 @@ namespace zintl::framework {
     class App {};
 
     class RealtimeApp : public App {
-    protected:
-        virtual ~RealtimeApp() = default;
-        void run_default();
     public:
+        virtual ~RealtimeApp() = default;
         virtual void run();
     };
 }

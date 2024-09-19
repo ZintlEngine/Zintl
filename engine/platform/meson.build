@@ -1,4 +1,5 @@
 current_sources = [
+    'gl/loader.cpp',
     'wgl/context.cpp',
     'win32/application.cpp',
     'win32/window.cpp',
