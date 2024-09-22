@@ -4,16 +4,17 @@
 
 using namespace zintl;
 
-#ifdef _WIN32
 #include <Windows.h>
-//extern "C" __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-//extern "C" __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
-#endif
 
-int main() {
+extern "C"
+{
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+}
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     framework::RealtimeApp app;
     try { app.run(); } catch (const std::runtime_error &err) {
-        std::cout << err.what() << std::endl;
+        MessageBoxA(NULL, err.what(), "", MB_OK);
     }
 
     return 0;
