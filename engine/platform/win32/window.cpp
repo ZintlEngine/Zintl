@@ -1,5 +1,6 @@
 #include <zintl/platform/win32.h>
 #include <stdexcept>
+#include <dwmapi.h>
 
 #define DEFAULT_DPI 96
 
@@ -9,17 +10,31 @@ LRESULT wndproc(
   WPARAM wParam,
   LPARAM lParam
 ) {
+    switch (message) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+    }
     return DefWindowProcW(hwnd, message, wParam, lParam);
 }
 
 namespace zintl::platform {
+    void Win32Window::applyDarkMode(const HWND &hwnd) {
+        HRESULT dwmResult = 0;
+        constexpr DWMNCRENDERINGPOLICY dwmRP = DWMNCRP_ENABLED;
+        dwmResult = DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &dwmRP, sizeof(dwmRP));
+        if (dwmResult != S_OK) throw std::runtime_error("DwmSetWindowAttribute failed with DWMWA_NCRENDERING_POLICY");
+        constexpr BOOL dwmEnableDarkmode = TRUE;
+        dwmResult = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dwmEnableDarkmode, sizeof(dwmEnableDarkmode));
+        if (dwmResult != S_OK) throw std::runtime_error("DwmSetWindowAttribute failed with DWMWA_USE_IMMERSIVE_DARK_MODE");
+    }
+
     HWND Win32Window::createWindow(const Win32WindowInitConfig &init) {
         const LPCWSTR className = L"ZintlWindow";
 
         WNDCLASSEXW wndClass;
         ZeroMemory(&wndClass, sizeof(wndClass));
         wndClass.cbSize = sizeof(wndClass);
-        wndClass.style = CS_HREDRAW | CS_VREDRAW;
+        wndClass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
         wndClass.lpszClassName = className;
         wndClass.hInstance = init.hInstance;
         wndClass.lpfnWndProc = wndproc;
@@ -60,6 +75,8 @@ namespace zintl::platform {
 
         ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
+
+        if (init.darkMode) applyDarkMode(hwnd);
 
         return hwnd;
     }
