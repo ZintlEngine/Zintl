@@ -28,12 +28,14 @@ namespace zintl::platform {
         int posX = -1, posY = -1, width = -1, height = -1;
         std::string title{};
         bool hidpi = true;
+        bool darkMode = false;
     };
 
     class Win32Window final : public PlatformWindow {
     private:
         HWND hwnd;
         static HWND createWindow(const Win32WindowInitConfig &config);
+        static void applyDarkMode(const HWND& hwnd);
 
     public:
         void *rawWindowHandle() override;

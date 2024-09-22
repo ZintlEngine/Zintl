@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <zintl/platform/wgl.h>
 #include <stdexcept>
 #include <gl/GL.h>
@@ -25,7 +26,7 @@ namespace zintl::platform {
 
     std::tuple<PFNWGLCHOOSEPIXELFORMATARBPROC, PFNWGLCREATECONTEXTATTRIBSARBPROC> WGLContext::getWGLExtensions() {
         // Create dummy window to get WGL extensions
-        const auto className = L"wglDummy";
+        const auto className = L"wgldummy";
         const auto hInstance = GetModuleHandle(nullptr);
 
         WNDCLASSEXW wndClass;
@@ -36,6 +37,8 @@ namespace zintl::platform {
         wndClass.hInstance = hInstance;
         wndClass.lpfnWndProc = wGLDummyWndproc;
 
+        RegisterClassExW(&wndClass);
+
         const auto dummyHwnd = CreateWindowExW(
             0,
             className,
@@ -43,27 +46,41 @@ namespace zintl::platform {
             WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
             0, 0, 1, 1,
             nullptr, nullptr, hInstance, nullptr);
+        if (!dummyHwnd) {
+            DWORD error = GetLastError();
+            std::ostringstream stream;
+            stream << "Failed to create dummy window : " << error;
+            throw std::runtime_error(stream.str().c_str());
+        }
 
         const auto dummyDC = GetDC(dummyHwnd);
-        const auto dummyPixelFormat = GetPixelFormat(dummyDC);
 
-        PIXELFORMATDESCRIPTOR dummyPFD;
-        ZeroMemory(&dummyPFD, sizeof(dummyPFD));
-        /*dummyPFD.nSize = sizeof(dummyPFD);
-        dummyPFD.nVersion = 1;
-        dummyPFD.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-        dummyPFD.iPixelType = PFD_TYPE_RGBA;
-        dummyPFD.cColorBits = 32;
-        dummyPFD.cAlphaBits = 8;
-        dummyPFD.iLayerType = PFD_MAIN_PLANE;
-        dummyPFD.cDepthBits = 24;
-        dummyPFD.cStencilBits = 8;*/
-
-        DescribePixelFormat(dummyDC, dummyPixelFormat, sizeof(dummyPFD), &dummyPFD);
+        PIXELFORMATDESCRIPTOR dummyPFD = {
+            sizeof(PIXELFORMATDESCRIPTOR),
+            1,
+            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+            PFD_TYPE_RGBA,
+            32,
+            0, 0, 0, 0, 0, 0,
+            8,
+            0,
+            0, 0, 0, 0, 0,
+            24,
+            0,
+            PFD_MAIN_PLANE,
+            0,
+            0, 0, 0,
+        };
 
         const auto pixelFormat = ChoosePixelFormat(dummyDC, &dummyPFD);
-        if (!pixelFormat) throw std::runtime_error("ChoosePixelFormat failed");
-        if (!SetPixelFormat(dummyDC, pixelFormat, &dummyPFD)) throw std::runtime_error("Failed to set Pixel format");
+        if (pixelFormat == 0) throw std::runtime_error("ChoosePixelFormat failed");
+        DescribePixelFormat(dummyDC, pixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &dummyPFD);
+        if (!SetPixelFormat(dummyDC, pixelFormat, &dummyPFD)) {
+            DWORD error = GetLastError();
+            std::ostringstream stream;
+            stream << "Failed to set Pixel format : " << error;
+            throw std::runtime_error(stream.str().c_str());
+        };
 
         const auto dummyContext = wglCreateContext(dummyDC);
         if (!dummyContext) throw std::runtime_error("Cannot create context");
@@ -103,7 +120,7 @@ namespace zintl::platform {
         this->dc = GetDC(hwnd);
         if (!this->dc) throw std::runtime_error("Cannot get window DC");
 
-        const int pixelAttribs[] = {
+        constexpr int pixelAttribs[] = {
             WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
             WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
             WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
@@ -120,8 +137,8 @@ namespace zintl::platform {
 
         int pixelFormatId;
         UINT numFormats;
-        const auto res = wglChoosePixelFormatARB(this->dc, pixelAttribs, nullptr, 1, &pixelFormatId, &numFormats);
-        if (!res) throw std::runtime_error("wglChoosePixelFormatARB failed");
+        if (!wglChoosePixelFormatARB(this->dc, pixelAttribs, nullptr, 1, &pixelFormatId, &numFormats))
+            throw std::runtime_error("wglChoosePixelFormatARB failed");
         if (numFormats == 0) throw std::runtime_error("No formats available");
 
         PIXELFORMATDESCRIPTOR pFD;
