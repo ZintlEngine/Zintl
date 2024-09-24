@@ -1,6 +1,7 @@
 engine_sources = []
 
 subdir('framework')
+subdir('graphics')
 subdir('platform')
 
 dwm_dep = declare_dependency(link_args : ['dwmapi.lib'])
